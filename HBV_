@@ -1,0 +1,423 @@
+
+%
+%      MODULE HBVMODEL
+%
+%      contains
+%
+function [itsteps,nzones,area,param,incon]=hbvmodel(itsteps,nzones,area,param,incon, prec,airt,ep,output)
+
+persistent aa age airt beta bmax bq bql cperc croute csf ddf ddfage ddfmax ddfmin dmoist dq dquh ep eta etp fc imodincon k0 k1 k2 lp lprat lsuz maxday maxout maxparam melt meltt melttemp moist moistold output prec precip q q0 q1 q2 qg rain sd sdold slz slzin slzold snow snowd sum_ml suz suzold swe sweold sweq temp tr ts xx ; 
+
+        
+%     ----- shell for HBV model -------------------------------------
+
+%      USE PARAMETERS
+
+ if isempty(imodincon), imodincon=4; end;
+ if isempty(maxout), maxout=20; end;
+ if isempty(maxparam), maxparam=15 ; end;
+
+ 
+param_orig=param;param_shape=[maxparam,nzones];param=reshape([param_orig(1:min(prod(param_shape),numel(param_orig))),zeros(1,max(0,prod(param_shape)-numel(param_orig)))],param_shape);
+incon_orig=incon;incon_shape=[imodincon,nzones];incon=reshape([incon_orig(1:min(prod(incon_shape),numel(incon_orig))),zeros(1,max(0,prod(incon_shape)-numel(incon_orig)))],incon_shape);
+ if isempty(prec), prec=zeros(itsteps,nzones); end;
+ if isempty(airt), airt=zeros(itsteps,nzones); end;
+ if isempty(ep), ep=zeros(itsteps,nzones); end;
+ if isempty(snowd), snowd=zeros(itsteps,nzones); end;
+ if isempty(output), output=zeros(nzones,maxout,itsteps); end;
+
+ if isempty(csf), csf=0; end;
+ if isempty(ddf), ddf=0; end;
+ if isempty(tr), tr=0; end;
+ if isempty(ts), ts=0; end;
+ if isempty(meltt), meltt=0; end;
+ if isempty(sweq), sweq=zeros(1,itsteps); end;
+ if isempty(lprat), lprat=0; end;
+ if isempty(lp), lp=0; end;
+ if isempty(fc), fc=0; end;
+ if isempty(beta), beta=0; end;
+% real(8) ::;
+%.*       k0,k1,k2,lsuz,cperc,bmax,croute;
+
+ if isempty(temp), temp=0; end;
+ if isempty(precip), precip=0; end;
+ if isempty(swe), swe=0; end;
+ if isempty(rain), rain=0; end;
+ if isempty(snow), snow=0; end;
+ if isempty(melt), melt=0; end;
+ if isempty(etp), etp=0; end;
+ if isempty(dmoist), dmoist=0; end;
+ if isempty(moist), moist=0; end;
+ if isempty(dq), dq=0; end;
+ if isempty(eta), eta=0; end;
+ if isempty(sd), sd=0; end;
+ if isempty(suz), suz=0; end;
+ if isempty(slz), slz=0; end;
+ if isempty(dquh), dquh=zeros(1,itsteps); end;
+ if isempty(qg), qg=0; end;
+ if isempty(q0), q0=0; end;
+ if isempty(q1), q1=0; end;
+ if isempty(q2), q2=0; end;
+ if isempty(q), q=zeros(1,itsteps); end;
+ if isempty(bql), bql=0; end;
+ if isempty(age), age=0; end;
+
+ if isempty(aa), aa=0; end;
+ if isempty(ddfmin), ddfmin=0; end;
+ if isempty(ddfmax), ddfmax=0; end;
+ if isempty(ddfage), ddfage=0; end;
+
+ if isempty(sdold), sdold=0; end;
+%      real(8) chng
+%      integer(4) nasim(nzones),nasim2(nzones),nasim3(nzones)
+
+ 
+
+%     ---- set up parameters ----
+%open(88,file='hbv.log')
+%write(88,*) nzones
+
+output(:)=0.;
+
+for izone=1:nzones;
+csf=param(1,izone);
+ddf=param(2,izone);
+tr=param(3,izone);
+ts=param(4,izone);
+meltt=param(5,izone);
+
+lprat=param(6,izone);
+fc=param(7,izone);
+beta=param(8,izone);
+
+lp=lprat.*fc;
+
+k0=param(9,izone);
+k1=param(10,izone);
+k2=param(11,izone);
+lsuz=param(12,izone);
+
+cperc=param(13,izone);
+bmax=param(14,izone);
+croute=param(15,izone);
+
+%write(88,*) csf,ddf
+ddfmin=1.0;
+ddfmax=6.0;
+ddfage=ddf;
+
+
+age=0;
+moist=incon(1,izone);
+swe=incon(2,izone);
+suz=incon(3,izone);
+slz=incon(4,izone);
+%for data logic_2, initial % of snow cover
+sdold=0.; %for data assimilation, initial % of snow cover
+
+if(area(izone)>0.0)
+for i=1:itsteps;
+q(i)=0.;
+dquh(i)=0.;
+end; i=itsteps+1;
+aa=area(izone);
+for it=1:itsteps;
+precip=prec(it,izone);
+temp=airt(it,izone);
+etp=ep(it,izone);
+sd=snowd(it,izone);
+
+%if (it <10) write(88,*) it, precip, temp, etp
+
+if(temp<-0.1);
+etp=0.;
+end;
+
+if(precip<-998.00)
+output(izone,1,it)=-999.99;
+output(izone,2,it)=-999.99;
+output(izone,3,it)=-999.99;
+output(izone,4,it)=-999.99;
+output(izone,5,it)=-999.99;
+output(izone,6,it)=-999.99;
+output(izone,7,it)=-999.99;
+output(izone,8,it)=-999.99;
+output(izone,9,it)=-999.99;
+output(izone,10,it)=-999.99;
+output(izone,11,it)=-999.99;
+output(izone,12,it)=-999.99;
+%goto  330;
+for it=1:itsteps;
+output(izone,1,it)=0.;
+output(izone,2,it)=0.;
+output(izone,3,it)=0.;
+output(izone,4,it)=0.;
+output(izone,5,it)=0.;
+output(izone,6,it)=0.;
+output(izone,7,it)=0.;
+output(izone,8,it)=0.;
+output(izone,9,it)=0.;
+output(izone,10,it)=0.;
+output(izone,11,it)=0.;
+output(izone,12,it)=0.;
+
+end 
+break; %get out of the if 
+end;
+ 
+
+snowmod(csf,ddf,tr,ts,meltt,temp,precip,swe,  rain,snow,melt);
+
+
+%Calculation of refreezing process
+
+%Refreezing of the liquid water is included in the model. It is defined in this case by the diurnal average temperature so that, below the threshold temperature TB,F, refreezing MF (positive value, mm d-1)is calculated according to the following formula:
+
+%mf=kf*(tbf-ta)^ef
+
+%where TB,F (癈), refreezing parameter KF (mm 癈-1 d-1) and empirical exponent eF have to be calibrated. According to Vehvil鋓nen (1992), average values and standard deviations of the parameters are as follows: TB,F ?.7 and 1.2 (癈), KF 1.5 and 1.4 and eF 0.36 and 0.44.
+
+
+soilmoisture(rain,melt,etp,lp,fc,beta,dmoist,moist,  dq,eta);
+
+respfunc(dq,k0,lsuz,k1,k2,cperc,bmax,croute,suz,slz,bql,dquh,qg,q0,q1,q2);
+
+for  irf=1:bql
+if((it+irf-1)<=itsteps); q(it+irf-1)=q(it+irf-1)+dquh(irf);end;
+end;
+
+% 300     continue;
+% 301     continue;
+
+%        q(it)=q(it)/24./3.6*area(izone)
+%        qg=qg/24./3.6*area(izone)
+%        q0=q0/24./3.6*area(izone)
+%        q1=q1/24./3.6*area(izone)
+%        q2=q2/24./3.6*area(izone)
+
+output(izone,1,it)=q(it);
+output(izone,2,it)=swe;
+% added by al.
+sweq(it)=swe;
+output(izone,3,it)=moist;
+output(izone,4,it)=rain;
+output(izone,5,it)=snow;
+output(izone,6,it)=melt;
+output(izone,7,it)=q0;
+output(izone,8,it)=q1;
+output(izone,9,it)=q2;
+output(izone,10,it)=eta;
+% added by al.
+output(izone,11,it)=suz;
+% added by al.
+output(izone,12,it)=slz;
+
+%      write(88,'(100f12.4)') rain,snow,melt,swe,moist,q(it)
+%write(88,'(100f12.4)') izone*1.,it*1.,q(it),output(izone,1,it),
+%     *   swe,output(izone,2,it)
+%      write(88,*) '#############################'
+%pause
+end; 
+% 330   continue;
+else
+for it=1:itsteps;
+output(izone,1,it)=0.;
+output(izone,2,it)=0.;
+output(izone,3,it)=0.;
+output(izone,4,it)=0.;
+output(izone,5,it)=0.;
+output(izone,6,it)=0.;
+output(izone,7,it)=0.;
+output(izone,8,it)=0.;
+output(izone,9,it)=0.;
+output(izone,10,it)=0.;
+output(izone,11,it)=0.;
+output(izone,12,it)=0.;
+
+end
+
+end;
+end;
+%close(88)
+return;
+
+ %subroutine hbvmodel; izone=nzones+1;
+
+
+
+function [dq,k0,lsuz,k1,k2,cperc,bmax,croute,suz]=respfunc(dq,k0,lsuz,k1,k2,cperc,bmax,croute,suz, slz,bql,dquh,qg,q0,q1,q2)
+
+ if isempty(maxday), maxday=15000 ; end;
+ if isempty(bql), bql=0; end;
+ if isempty(bq), bq=0; end;
+ if isempty(slz), slz=0; end;
+ if isempty(suzold), suzold=0; end;
+ if isempty(slzold), slzold=0; end;
+ if isempty(slzin), slzin=0; end;
+ if isempty(q0), q0=0; end;
+ if isempty(q1), q1=0; end;
+ if isempty(q2), q2=0; end;
+ if isempty(qg), qg=0; end;
+ if isempty(sum_ml), sum_ml=0; end;
+ if isempty(dquh), dquh=zeros(1,maxday); end;
+
+dt=1.;
+
+%     dt=1.
+%     ----- new ---
+rat=1.0;
+suzold=suz+rat.*dq;
+slzold=slz+(1.-rat).*dq;
+slzin=cperc;
+
+if(suzold<0.);
+ suzold=0.;
+end;
+if(slzold<0.);
+ slzold=0.;
+end;
+
+
+%     --- upper storage ---
+if(suzold>lsuz);
+q0=(suzold-lsuz)./k0.*exp(-1../k0);
+if(q0<0.);
+ q0=0.;
+end;
+if(q0>(suzold-lsuz));
+ q0=suzold-lsuz;
+end;
+else
+q0=0.;
+end;
+suzold=suzold-q0;
+q1=-slzin+(slzin+suzold./k1).*exp(-1../k1);
+if(q1<0.0);
+ q1=0.;
+end;
+suz=suzold-q1-slzin;
+if(suz<0.);
+suz=0.;
+slzin=suzold;
+end;
+
+%     --- lower storage ---
+q2=slzin-(slzin-slzold./k2).*exp(-1../k2);
+if(q2<0.);
+ q2=0.;
+end;
+slz=slzold-q2+slzin;
+if(slz<0.);
+slz=0.;
+q2=slzold+slzin;
+end;
+
+
+qg=q0+q1+q2;
+
+%     --- transformation function ---
+if((bmax-croute.*qg)>1.0)
+bq=bmax-croute.*qg;
+bql=fix(fix(bq));
+sum_ml=0.;
+for  j=1:bql
+    
+if(j<=fix(bql./2));
+dquh(j)=((j-0.5).*4..*qg)./(bql.*bql.*1.);
+elseif(abs(j-(bql./2.+0.5))<0.1) ;
+dquh(j)=((j-0.75) .*4..*qg)./(bql.*bql.*1.);
+else
+dquh(j)=((bql-j+0.5).*4..*qg)./(bql.*bql.*1.);
+end;
+end;
+sum_ml=sum_ml+dquh(j);
+% 400    continue;
+else
+bql=1;
+dquh(1)=qg;
+sum_ml=qg;
+end;
+return;
+
+
+
+
+function [rain,melt,etp,lp,fc,beta,dmoist,moist]=soilmoisture(rain,melt,etp,lp,fc,beta,dmoist,moist, dq,eta)
+
+ if isempty(moistold), moistold=0; end;
+ if isempty(xx), xx=0; end;
+ if isempty(dq), dq=0; end;
+ if isempty(eta), eta=0; end;
+
+%     --- soil mositure accounting ----
+moistold=moist;
+dq=((moistold./fc).^beta).*(rain+melt);
+if(dq>(rain+melt));
+ dq=rain+melt;
+end;
+dmoist=rain+melt-dq;
+if(dmoist<0.);
+ dmoist=0.;
+end;
+moist=moistold+dmoist;
+if(moist>fc);
+dq=(moist-fc)+dq;
+moist=fc;
+end;
+%     --- calculate evapotranspiration ---
+if(moist<lp);
+eta=moist.*etp./lp;
+if(eta>etp);
+eta=etp;
+end;
+else
+eta=etp;
+end;
+if(eta<0.);
+ eta=0.;
+end;
+%     --- substract eta of soilmoisture ---
+xx=moist;
+moist=moist-eta;
+if(moist<0.);
+eta=xx;
+moist=0.;
+end;
+return;
+
+ %subroutine soilmoisture
+
+function [csf,ddf,tr,ts,melttemp,temp,precip,swe]=snowmod(csf,ddf,tr,ts,melttemp,temp,precip,swe,     rain,snow,melt)
+
+%       real(8) dsrtemp,dd1
+ if isempty(rain), rain=0; end;
+ if isempty(snow), snow=0; end;
+ if isempty(sweold), sweold=0; end;
+ if isempty(melt), melt=0; end;
+
+if(temp<ts);
+snow=precip;
+elseif(temp>tr) ;
+snow=0.;
+else
+snow=precip.*abs(temp-tr)./abs(tr-ts);
+end;
+rain=precip-snow;
+
+
+melt=(temp-melttemp).*ddf;
+if(melt < 0.);
+ melt=0.;
+end;
+%      --- Bestimme SWE
+sweold=swe;
+swe=sweold+csf.*snow-melt;
+if(swe<0.0001);
+swe=0.;
+melt=sweold+csf.*snow;
+if(melt<0.);
+ melt=0.;
+end;
+end;
+return;
+  %subroutine snowmod
