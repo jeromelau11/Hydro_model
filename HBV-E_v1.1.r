@@ -2,13 +2,13 @@
 #################################################################################
 # Model information
 # Model name: HBV-Extended (HBV-E) hydrological model
-# Model developer: Zhiyong Liu and Chao Li
-# Contact: zhiyong.liu@noaa.gov (or zhiy.liu@outlook.com); chaoli@uvic.ca 
+# Model developer: Zhiyong Liu 
+# Contact: liuzhiy25@mail.sysu.edu.cn
 # Version: HBV-E v1.1
 # Language: R 
 # Model type: physically-based / conceptual 
 # Time scales: applications in daily time steps (aims to hourly and monthly scales)
-# Date: 2017-03-01
+# Update Date: 2025-04-01
 #################################################################################
 
 
